@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "893105852039",
+    "project_id": "employee-connect-772d3",
+    "storage_bucket": "employee-connect-772d3.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893105852039:android:13fcc5e421421f2ed23222",
+        "android_client_info": {
+          "package_name": "com.orlah.phidrillsim_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYKfaR55Ay-v5NTcAVYdCYgV7lrDoAtgA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

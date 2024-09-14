@@ -1,0 +1,130 @@
+name: phidrillsim_connect
+description: "
+The app is designed to accommodate different user roles, with a hierarchy that includes employees, supervisors, and admins. When users sign up, they create personal profiles with details such as name, department, and role, which are stored in a backend database.
+Employee Profiles: Each employee profile is linked to a unique user account, authenticated through a secure login system (JWT/Session). Users have access to personal dashboards where they can view their profile details and update them as necessary.
+Supervisor Control: Supervisors are granted elevated permissions allowing them to activate or deactivate employee accounts. This involves changing the employee's status in the database (active/inactive), which affects their access to the system (e.g., through role-based access control - RBAC). When an employee is deactivated (sacked or resigned), their profile becomes inaccessible, and any pending file submissions are disabled.
+
+Admin Roles: Admins, typically senior officers, have the highest level of access and oversight within the app. They can manage user permissions across the entire organization, delete profiles of employees who are no longer with the company, and have the ability to track overall system activity (e.g., user login activity, document submission history). This admin functionality is tied into the backend via API calls that interact with user and role data.
+
+Document Submission and Management:
+The core functionality of PHIDrillSim revolves around employees submitting work-related files and documents for review.
+File Uploading: Employees can upload documents (in various formats such as PDFs, DOCX, etc.) through the app. These files are securely stored in a cloud-based storage system (e.g., AWS S3 or Firebase Storage) linked to the backend. Each file is associated with metadata that includes submission time, the employee’s details, and submission status (pending, approved, or rejected).
+
+Supervisor Review System: Once a file is uploaded, it is routed to the employee’s supervisor for review. Supervisors receive a notification (via push notifications or email, depending on the implementation) and can approve, reject, or request modifications on the document. This triggers updates in both the employee’s dashboard and the supervisor’s view, allowing seamless tracking of document status. The decision is stored in the backend, with reasons for rejection being captured for transparency.
+
+Departmental and General Communication Channels:
+Each department within the organization has a dedicated communication channel, with access restricted to members of that department. These channels serve as spaces for department-wide announcements and collaborations.
+
+Department-Specific Channels: The communication system operates similarly to popular chat applications, using WebSockets or Firebase Realtime Database for real-time messaging. Department members can share text, links, and files relevant to their work. Access to these channels is role-based, ensuring only members of a specific department can view or participate.
+
+General Communication Channel: In addition to departmental channels, there is a general company-wide communication space, used for announcements and cross-department discussions. This feature allows for real-time updates and discussions that require input or awareness across the entire organization.
+
+Employee Management and Status Monitoring:
+
+PHIDrillSim connect includes comprehensive employee management tools for supervisors and admins.
+Employee Activation/Deactivation: Supervisors can activate or deactivate employees by updating their status in the database. This feature is built using a backend service (e.g., REST API) that modifies user states, affecting their access to the app. Deactivated employees lose access to their profiles and file submission functionalities.
+
+Employee Deletion: Admins have the ability to delete profiles of employees who are no longer part of the organization. This functionality removes all employee data from the database (or flags it as archived for compliance reasons), ensuring that the system only reflects active users.
+Monitoring & Reports: Supervisors and admins can generate reports on employee activities such as file submissions, approvals, rejections, and login logs. This feature is powered by backend queries that aggregate user activity data into dashboards or downloadable reports (in formats such as CSV, JSON).
+
+Secure Authentication and Authorization:
+Security is a critical component of PHIDrillSim connect, especially considering the sensitivity of work-related documents.
+Authentication: The app uses a secure authentication system, possibly OAuth2, JWT tokens, or session-based authentication, ensuring that users can securely log in. Passwords are hashed and stored in a database, ensuring best practices for security.
+Authorization: Role-based access control (RBAC) is implemented to ensure that employees, supervisors, and admins can only access the features relevant to their role. This involves checking user roles at both the frontend (UI components are hidden if unauthorized) and backend (API calls are restricted based on roles).
+
+
+Backend & Data Management:
+
+The backend is designed to handle large volumes of employee data, files, and real-time communication. It may be built using modern backend frameworks such as Node.js, Django, or Flask, with a scalable database such as PostgreSQL, MongoDB, or Firebase.
+Document Management: The backend tracks file submissions, approvals, and rejections, updating the status of each document in real time. It interfaces with cloud storage solutions (e.g., AWS S3) for file storage, ensuring scalability.
+Notification System: Push notifications and emails are triggered when an employee submits a document, or when a supervisor approves or rejects it. This feature can be built using Firebase Cloud Messaging (FCM) or third-party services like Twilio or SendGrid for emails.
+
+Prepared by Oladimeji Olanrewaju
+
+"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.4 <4.0.0'
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.6
+  firebase_auth: ^5.2.0
+  firebase_core: ^3.4.1
+  cloud_firestore: ^5.4.0
+  smooth_page_indicator: ^1.0.0
+  provider: ^6.1.2
+  flutter_spinkit: ^5.2.1
+  image_picker: ^0.8.7+4
+  firebase_storage: ^12.3.0
+  intl: ^0.17.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.9.2
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - assets/images/
+  #   - images/a_dot_ham.jpeg
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/assets-and-images/#resolution-aware
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/assets-and-images/#from-packages
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/custom-fonts/#from-packages

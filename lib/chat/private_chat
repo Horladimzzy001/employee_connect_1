@@ -1,0 +1,213 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:phidrillsim_connect/loading.dart';
+
+
+import 'package:phidrillsim_connect/chat/chat_page.dart';
+
+class PrivateChat extends StatefulWidget {
+  @override
+  _PrivateChatState createState() => _PrivateChatState();
+}
+
+class _PrivateChatState extends State<PrivateChat> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  String _currentUserName = '';
+  Map<String, dynamic>? _currentUserData;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUserData();
+  }
+
+  Future<void> _getCurrentUserData() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      var userData = userDoc.data() as Map<String, dynamic>;
+
+      setState(() {
+        _currentUserData = userData;
+        _currentUserName = '${userData['firstName']} ${userData['surname']}';
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getRecentChats() async {
+    // Fetch messages where current user is the sender
+    QuerySnapshot sentMessagesSnapshot = await _firestore
+        .collection('messages')
+        .where('sender', isEqualTo: _currentUserName)
+        .get();
+
+    // Fetch messages where current user is the receiver
+    QuerySnapshot receivedMessagesSnapshot = await _firestore
+        .collection('messages')
+        .where('receiver', isEqualTo: _currentUserName)
+        .get();
+
+    // Combine both lists of messages
+    List<QueryDocumentSnapshot> allMessages = [
+      ...sentMessagesSnapshot.docs,
+      ...receivedMessagesSnapshot.docs,
+    ];
+
+    // Create a map to store the most recent message for each conversation
+    Map<String, Map<String, dynamic>> recentChatsMap = {};
+
+    for (var doc in allMessages) {
+      var data = doc.data() as Map<String, dynamic>;
+      String otherUserName = data['sender'] == _currentUserName
+          ? data['receiver']
+          : data['sender'];
+
+      if (!recentChatsMap.containsKey(otherUserName) ||
+          data['time'].compareTo(recentChatsMap[otherUserName]!['time']) > 0) {
+        recentChatsMap[otherUserName] = {
+          'name': otherUserName,
+          'lastMessage': data['message'],
+          'time': data['time'],
+        };
+      }
+    }
+
+    // Convert the map values to a list and sort by time descending
+    List<Map<String, dynamic>> recentChats = recentChatsMap.values.toList();
+    recentChats.sort((a, b) => b['time'].compareTo(a['time']));
+
+    return recentChats;
+  }
+
+  void _openChat(Map<String, dynamic> selectedUserData) async {
+    // Fetch selected user's data from Firestore
+    QuerySnapshot userSnapshot = await _firestore
+        .collection('users')
+        .where('firstName', isEqualTo: selectedUserData['firstName'])
+        .where('surname', isEqualTo: selectedUserData['surname'])
+        .get();
+
+    if (userSnapshot.docs.isNotEmpty) {
+      var userData = userSnapshot.docs.first.data() as Map<String, dynamic>;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(
+            currentUser: _currentUserData!,
+            selectedUser: userData,
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, // White background
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header Row
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.arrow_back, color: Colors.blue),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                Text(
+                  'Private Chats',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+            Expanded(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _getRecentChats(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                        child:
+                            Text('Error fetching chats: ${snapshot.error}'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Loading(); // Use your custom Loading class
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(child: Text('No recent chats'));
+                  }
+
+                  List<Map<String, dynamic>> recentChats = snapshot.data!;
+
+                  return ListView.separated(
+                    padding: EdgeInsets.all(16),
+                    itemCount: recentChats.length,
+                    separatorBuilder: (context, index) => Divider(),
+                    itemBuilder: (context, index) {
+                      var chat = recentChats[index];
+                      String name = chat['name'];
+                      String lastMessage = chat['lastMessage'];
+                      Timestamp timestamp = chat['time'];
+                      DateTime time = timestamp.toDate();
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue[100],
+                          child: Text(
+                            name.isNotEmpty ? name[0] : '',
+                            style: TextStyle(color: Colors.blue),
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        onTap: () {
+                          // Extract first name and surname from the name
+                          List<String> nameParts = name.split(' ');
+                          String firstName = nameParts[0];
+                          String surname =
+                              nameParts.length > 1 ? nameParts[1] : '';
+
+                          Map<String, dynamic> selectedUserData = {
+                            'firstName': firstName,
+                            'surname': surname,
+                          };
+
+                          _openChat(selectedUserData);
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

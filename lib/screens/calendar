@@ -1,0 +1,443 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth for current user
+import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart'; // For formatting time
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:phidrillsim_connect/mailer.dart';
+
+
+import 'package:phidrillsim_connect/loading.dart';
+
+class CalendarPage extends StatefulWidget {
+  @override
+  _CalendarPageState createState() => _CalendarPageState();
+}
+
+class _CalendarPageState extends State<CalendarPage> {
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  TimeOfDay? _selectedTime;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _meetingTitleController = TextEditingController();
+  final TextEditingController _meetingDescriptionController = TextEditingController();
+
+  User? user = FirebaseAuth.instance.currentUser;
+  String organizerName = 'Unknown Organizer'; // Default value for organizer
+
+
+  void onNewMeetingCreated(Map<String, dynamic> meetingData) async {
+  try {
+    // Call the sendEmailOnMeetingCreation function from your mailer.dart file
+    await sendEmailOnMeetingCreation(meetingData);
+    print('Emails sent successfully!');
+  } catch (e) {
+    print('Error sending emails: $e');
+  }
+}
+
+
+  // Function to fetch user details from Firestore
+  Future<void> _fetchUserDetails() async {
+    if (user != null) {
+      DocumentSnapshot userData = await _firestore.collection('users').doc(user!.uid).get();
+      if (userData.exists) {
+        setState(() {
+          organizerName = "${userData['firstName']} ${userData['surname']}";
+        });
+      }
+    }
+  }
+
+  // Call this method when initializing the widget
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserDetails(); // Fetch the current user's name
+  }
+
+  // Function to open a time picker
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
+  }
+
+  // Add a meeting to Firestore
+  void _addMeeting() async {
+  if (_selectedDay != null && _meetingTitleController.text.isNotEmpty && _selectedTime != null) {
+    final meetingTime = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day, _selectedTime!.hour, _selectedTime!.minute);
+
+    // Meeting data to add to Firestore and pass to the email function
+    Map<String, dynamic> meetingData = {
+      'title': _meetingTitleController.text.trim(),
+      'description': _meetingDescriptionController.text.trim(),
+      'date': _selectedDay,
+      'time': meetingTime,
+      'organizer': organizerName,
+      'organizerDepartment': 'Your Organizer Department',  // Replace or fetch the actual department
+      'organizerStatus': 'Your Organizer Status',  // e.g., Visitor/Client/Employee
+    };
+
+    // Add meeting to Firestore
+    await _firestore.collection('meetings').add(meetingData);
+
+    // Call the function to send emails with the meeting data
+    onNewMeetingCreated(meetingData);
+
+    // Send Firebase Cloud Messaging (FCM) notification
+    FirebaseMessaging.instance.sendMessage(
+      data: {
+        'title': 'New Meeting Scheduled',
+        'body': 'A new meeting has been scheduled on the calendar.',
+        'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+      },
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Meeting added for ${DateFormat('MMM dd, yyyy').format(_selectedDay!)} at ${_selectedTime!.format(context)}")));
+
+    // Clear input fields
+    _meetingTitleController.clear();
+    _meetingDescriptionController.clear();
+    setState(() {
+      _selectedTime = null;
+    });
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Please fill in all the fields and select a time!")));
+  }
+}
+
+
+  // Delete a meeting from Firestore
+  void _deleteMeeting(String meetingId) async {
+    await _firestore.collection('meetings').doc(meetingId).delete();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Meeting deleted successfully")),
+    );
+  }
+
+  // Fetch meetings for the selected day from Firestore
+  Stream<QuerySnapshot> _getMeetingsForDay(DateTime day) {
+    return _firestore
+        .collection('meetings')
+        .where('date', isEqualTo: day)
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, // Set background color to white
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              child: Row(
+                children: [
+                  Text(
+                    'Meeting Calendar',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Spacer(),
+                  Icon(
+                    Icons.calendar_today,
+                    color: Colors.blue,
+                    size: 28,
+                  ),
+                ],
+              ),
+            ),
+            // Calendar Widget
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 16.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              child: TableCalendar(
+                focusedDay: _focusedDay,
+                firstDay: DateTime(2000),
+                lastDay: DateTime(2050),
+                calendarFormat: _calendarFormat,
+                selectedDayPredicate: (day) {
+                  return isSameDay(_selectedDay, day);
+                },
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                },
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
+                },
+                calendarStyle: CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: Colors.blue[200],
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  outsideDaysVisible: false,
+                ),
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+            // Display meetings for the selected day
+            if (_selectedDay != null)
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _getMeetingsForDay(_selectedDay!),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text("Error: ${snapshot.error}"));
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                      // Or use your Loading widget if you have one
+                    }
+
+                    final meetings = snapshot.data?.docs ?? [];
+
+                    if (meetings.isEmpty) {
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        children: [
+                          SizedBox(height: 20),
+                          Text(
+                            "No activities for this day",
+                            style: TextStyle(fontSize: 16.0, color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 20),
+                          _meetingInputSection(),
+                        ],
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: meetings.length + 1, // Add one for the input section
+                      itemBuilder: (context, index) {
+                        if (index < meetings.length) {
+                          var meeting = meetings[index];
+                          var meetingTime = (meeting['time'] as Timestamp).toDate();
+                          var organizer = meeting['organizer'] ?? 'Unknown Organizer';
+
+                          return Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            elevation: 2,
+                            margin: EdgeInsets.symmetric(vertical: 8.0),
+                            child: ListTile(
+                              title: Text(
+                                meeting['title'],
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                "Time: ${DateFormat('hh:mm a').format(meetingTime)}\nOrganizer: $organizer",
+                                style: TextStyle(color: Colors.grey[700]),
+                              ),
+                              trailing: IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  // Show a confirmation dialog
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) {
+                                      return AlertDialog(
+                                        title: Text("Delete Meeting"),
+                                        content: Text("Are you sure you want to delete this meeting?"),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context); // Close the dialog
+                                            },
+                                            child: Text("Cancel"),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context); // Close the dialog before deletion
+                                              _deleteMeeting(meeting.id); // Call the delete function
+                                            },
+                                            child: Text("Delete", style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                              onTap: () {
+                                // Show meeting details in a dialog
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      title: Text(meeting['title']),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text("Time: ${DateFormat('hh:mm a').format(meetingTime)}"),
+                                          SizedBox(height: 10),
+                                          Text("Organizer: $organizer"),
+                                          SizedBox(height: 10),
+                                          Text("Details: ${meeting['description']}"),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text("Close"),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          );
+                        } else {
+                          // This is the last item (input section)
+                          return Column(
+                            children: [
+                              SizedBox(height: 20),
+                              _meetingInputSection(),
+                            ],
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_selectedDay == null)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    "Please select a date to view or add meetings.",
+                    style: TextStyle(fontSize: 16.0, color: Colors.grey[600]),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Input Section for new meetings
+  Widget _meetingInputSection() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      margin: EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          // Meeting Title Input
+          TextField(
+            controller: _meetingTitleController,
+            decoration: InputDecoration(
+              labelText: "Meeting Title",
+              labelStyle: TextStyle(color: Colors.blue),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+              prefixIcon: Icon(Icons.title, color: Colors.blue),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.blue, width: 2.0),
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          // Meeting Description Input
+          TextField(
+            controller: _meetingDescriptionController,
+            decoration: InputDecoration(
+              labelText: "Meeting Description",
+              labelStyle: TextStyle(color: Colors.blue),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+              prefixIcon: Icon(Icons.description, color: Colors.blue),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.blue, width: 2.0),
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+            ),
+            maxLines: 2,
+          ),
+          SizedBox(height: 10),
+          // Time Picker Button and Add Meeting Button
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _selectTime(context),
+                  icon: Icon(Icons.access_time),
+                  label: Text(_selectedTime == null
+                      ? "Select Time"
+                      : "Time: ${_selectedTime!.format(context)}"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue, // Background color
+                    padding: EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(10.0)),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _addMeeting,
+                child: Text("Add Meeting"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green, // Background color
+                  padding: EdgeInsets.symmetric(vertical: 14.0, horizontal: 20.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(10.0)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _meetingTitleController.dispose();
+    _meetingDescriptionController.dispose();
+    super.dispose();
+  }
+} 

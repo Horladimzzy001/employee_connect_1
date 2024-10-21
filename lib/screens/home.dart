@@ -29,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _role = '';
   String _profilePictureURL = '';
   bool _isEmailVerified = false;
+  String _userId = ''; // Add this line to store the userId
   final GlobalKey<ScaffoldState> _scaffoldKey =
       GlobalKey<ScaffoldState>(); // To control the sidebar
 
@@ -56,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _role = userData['role'] ?? 'General';
           _profilePictureURL = userData['profilePictureURL'] ?? '';
           _isEmailVerified = user.emailVerified;
+          _userId = user.uid; // Store the userId
           
         });
       }
@@ -267,6 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
           'department': _department,
           'status': _status,
           'role': _role, // Make sure to include the role
+          'userId': _userId, // Include the userId here
+          'profilePictureURL': _profilePictureURL, // Include profile picture URL if needed
+         'deviceToken': '', // Include deviceToken if you have it
         };
 
         Navigator.push(
@@ -342,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
 
 
 

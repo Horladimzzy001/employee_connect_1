@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:phidrillsim_connect/loading.dart';
 import 'package:phidrillsim_connect/main.dart'; // Import the loading screen
 
-// Import your AuthCheck class or screen
-
-
 class IntroductionPage extends StatefulWidget {
   @override
   _IntroductionPageState createState() => _IntroductionPageState();
@@ -58,145 +55,157 @@ class _IntroductionPageState extends State<IntroductionPage> {
         ? Loading() // Show loading screen if still loading
         : Scaffold(
             backgroundColor: Colors.white, // Set background color to white
-            body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Column(
-                  children: [
-                    // Skip Button
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => AuthCheck()),
-                          );
-                        },
-                        child: Text(
-                          'Skip',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: _onboardingItems.length,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentIndex = index;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Image with same width and border radius
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Image.asset(
-                                    _onboardingItems[index]['image']!,
-                                    width:
-                                        MediaQuery.of(context).size.width * 0.8,
-                                    height: 250,
-                                    fit: BoxFit.cover, // Ensure the image fits properly
-                                  ),
-                                ),
-                                SizedBox(height: 40),
-                                // Title
-                                Text(
-                                  _onboardingItems[index]['title']!,
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 20),
-                                // Description
-                                Text(
-                                  _onboardingItems[index]['description']!,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[700],
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    // Dots Indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        _onboardingItems.length,
-                        (index) => AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          margin: EdgeInsets.symmetric(horizontal: 5),
-                          width: _currentIndex == index ? 12 : 8,
-                          height: _currentIndex == index ? 12 : 8,
-                          decoration: BoxDecoration(
-                            color: _currentIndex == index
-                                ? Colors.blue
-                                : Colors.grey[400],
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 30),
-                    // Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_currentIndex == _onboardingItems.length - 1) {
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                // Determine if the screen is small or large
+                bool isLargeScreen = constraints.maxWidth > 800;
+                double horizontalPadding = isLargeScreen ? 100 : 24.0;
+                double imageWidth = isLargeScreen ? 600 : constraints.maxWidth * 0.8;
+                double imageHeight = isLargeScreen ? 400 : 250;
+
+                return SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: horizontalPadding),
+                    child: Column(
+                      children: [
+                        // Skip Button
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: TextButton(
+                            onPressed: () {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(builder: (context) => AuthCheck()),
                               );
-                            } else {
-                              _pageController.nextPage(
-                                duration: Duration(milliseconds: 500),
-                                curve: Curves.easeInOut,
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue, // Background color
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
-                          child: Text(
-                            _currentIndex == _onboardingItems.length - 1
-                                ? "Get Started"
-                                : "Continue",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
+                            },
+                            child: Text(
+                              'Skip',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        Expanded(
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: _onboardingItems.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              return SingleChildScrollView(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      // Image with responsive width and height
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Image.asset(
+                                          _onboardingItems[index]['image']!,
+                                          width: imageWidth,
+                                          height: imageHeight,
+                                          fit: BoxFit.cover, // Ensure the image fits properly
+                                        ),
+                                      ),
+                                      SizedBox(height: 40),
+                                      // Title
+                                      Text(
+                                        _onboardingItems[index]['title']!,
+                                        style: TextStyle(
+                                          fontSize: isLargeScreen ? 32 : 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(height: 20),
+                                      // Description
+                                      Text(
+                                        _onboardingItems[index]['description']!,
+                                        style: TextStyle(
+                                          fontSize: isLargeScreen ? 18 : 16,
+                                          color: Colors.grey[700],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        // Dots Indicator
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _onboardingItems.length,
+                            (index) => AnimatedContainer(
+                              duration: Duration(milliseconds: 300),
+                              margin: EdgeInsets.symmetric(horizontal: 5),
+                              width: _currentIndex == index ? 12 : 8,
+                              height: _currentIndex == index ? 12 : 8,
+                              decoration: BoxDecoration(
+                                color: _currentIndex == index
+                                    ? Colors.blue
+                                    : Colors.grey[400],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 30),
+                        // Button
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isLargeScreen ? 100 : 0),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                if (_currentIndex == _onboardingItems.length - 1) {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => AuthCheck()),
+                                  );
+                                } else {
+                                  _pageController.nextPage(
+                                    duration: Duration(milliseconds: 500),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue, // Background color
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: Text(
+                                _currentIndex == _onboardingItems.length - 1
+                                    ? "Get Started"
+                                    : "Continue",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                      ],
                     ),
-                    SizedBox(height: 20),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           );
   }

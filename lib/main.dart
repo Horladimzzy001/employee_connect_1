@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase core
 import 'package:firebase_auth/firebase_auth.dart'; // Firebase Auth
@@ -10,6 +11,36 @@ import 'package:firebase_app_check/firebase_app_check.dart'; // Firebase App Che
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart'; // OneSignal
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+
+
+
+// Dr Etaje Abeg o
+// Future<bool> _requestStoragePermission() async {
+//   if (Platform.isAndroid) {
+//     var androidInfo = await DeviceInfoPlugin().androidInfo;
+//     if (androidInfo.version.sdkInt >= 30) {
+//       // Android 11 and above
+//       var status = await Permission.storage.status;
+//       if (status.isGranted) {
+//         return true;
+//       } else {
+//         var result = await Permission.storage.request();
+//         return result == PermissionStatus.granted;
+//       }
+//     } else {
+//       // Below Android 11
+//       return await _requestPermission(Permission.storage);
+//     }
+//   }
+//   return true;
+// }
+
+
 
 
 // Create a global instance of Local Notifications
@@ -44,7 +75,22 @@ Future<void> _showNotification(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter is initialized
-  await Firebase.initializeApp(); // Initialize Firebase
+  if (kIsWeb) {
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: "AIzaSyBUUE4BZtCV9NWGjSiNDUDem32XDBtJlM4",
+      authDomain: "employee-connect-772d3.firebaseapp.com",
+      databaseURL: "https://employee-connect-772d3-default-rtdb.firebaseio.com",
+      projectId: "employee-connect-772d3",
+      storageBucket: "employee-connect-772d3.appspot.com",
+      messagingSenderId: "893105852039",
+      appId: "1:893105852039:web:a994dfcaec41e9f3d23222",
+    ),
+  );
+} else {
+  await Firebase.initializeApp(); // For mobile platforms
+}
+
   
   // Activate Firebase App Check
   await FirebaseAppCheck.instance.activate(
@@ -53,13 +99,38 @@ void main() async {
     appleProvider: AppleProvider.appAttest,
   );
   
-  // Initialize OneSignal
-  OneSignal.shared.setAppId("fccf0d7c-8243-46dd-af70-1b359d1ec095"); // Your OneSignal App ID
+// Initialize OneSignal
+  OneSignal.shared.setAppId("fccf0d7c-8243-46dd-af70-1b359d1ec095");
+
+  // Retrieve the Player ID and store it in Firestore
+  OneSignal.shared.getDeviceState().then((deviceState) async {
+    String? playerId = deviceState?.userId;
+    if (playerId != null) {
+      // Assuming you have a method to get the current user's UID
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+
+      // Store the Player ID in Firestore
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'playerId': playerId,
+      });
+    }
+  });
 
   // Optional: request user's permission for notifications (for iOS)
   OneSignal.shared.promptUserForPushNotificationPermission().then((accepted) {
     print("Accepted permission: $accepted");
   });
+
+  // Handle notification opened event
+OneSignal.shared.setNotificationOpenedHandler((OSNotificationOpenedResult result) {
+  print("Notification opened: ${result.notification.jsonRepresentation().replaceAll("\\n", "\n")}");
+});
+
+// Handle notification received event
+OneSignal.shared.setNotificationWillShowInForegroundHandler((OSNotificationReceivedEvent event) {
+  print("Notification received: ${event.notification.jsonRepresentation().replaceAll("\\n", "\n")}");
+});
+
 
   // Initialize Firebase Messaging
   FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -78,6 +149,8 @@ void main() async {
   } else {
     print('User declined or has not accepted permission');
   }
+  // // Request storage permission after notifications permission
+  // await requestStoragePermission(); // <-- Add this line
 
   // Set up background messaging handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

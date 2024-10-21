@@ -6,12 +6,159 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:phidrillsim_connect/loading.dart'; // Assuming you have this loading widget
 import 'dart:io';
+import 'package:flutter/widgets.dart'; // For WillPopScope
+import 'package:path/path.dart' as path;
+import 'package:lecle_downloads_path_provider/lecle_downloads_path_provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:mime/mime.dart'; // For determining MIME types
+import 'package:cached_network_image/cached_network_image.dart'; // For image caching
 
+
+import 'package:path/path.dart' as path_lib;
 
 
 
 import 'package:path_provider/path_provider.dart'; // For getting local directory
 import 'package:path/path.dart' as path;
+
+class ImagePreviewPage extends StatefulWidget {
+  final String imageUrl;
+  final String filePath;
+  final String fileName;
+
+  ImagePreviewPage({required this.imageUrl, required this.filePath, required this.fileName});
+
+  @override
+  _ImagePreviewPageState createState() => _ImagePreviewPageState();
+}
+
+class _ImagePreviewPageState extends State<ImagePreviewPage> {
+  bool _isLoading = false;
+  // dimeji here
+  static const platform = MethodChannel('com.phidrillsim.connect/download');
+// dim
+  FirebaseStorage storage = FirebaseStorage.instance;
+
+  // Method to download the image
+Future<void> _downloadImage() async {
+  setState(() => _isLoading = true);
+  try {
+    final Reference ref = storage.ref(widget.filePath);
+    final String downloadURL = await ref.getDownloadURL();
+
+    // Get MIME type of the file
+    final mimeType = lookupMimeType(widget.fileName) ?? 'application/octet-stream';
+
+    // Call the platform-specific code
+    final result = await platform.invokeMethod('saveFileToDownloads', {
+      'url': downloadURL,
+      'fileName': widget.fileName,
+      'mimeType': mimeType,
+    });
+
+    _showInfoDialog("Image downloaded successfully");
+  } on PlatformException catch (e) {
+    _showErrorDialog("Error downloading image: ${e.message}");
+  } catch (e) {
+    _showErrorDialog("Error downloading image: $e");
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+
+  // Future<bool> _requestStoragePermission() async {
+  //   if (Platform.isAndroid) {
+  //     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  //     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+  //     if (androidInfo.version.sdkInt >= 30) {
+  //       // For Android 11 and above
+  //       var status = await Permission.manageExternalStorage.status;
+  //       if (status.isGranted) {
+  //         return true;
+  //       } else if (status.isDenied) {
+  //         var result = await Permission.manageExternalStorage.request();
+  //         return result == PermissionStatus.granted;
+  //       } else if (status.isPermanentlyDenied) {
+  //         await openAppSettings();
+  //         return false;
+  //       }
+  //     } else {
+  //       // For Android 10 and below
+  //       var status = await Permission.storage.status;
+  //       if (status.isGranted) {
+  //         return true;
+  //       } else if (status.isDenied) {
+  //         var result = await Permission.storage.request();
+  //         return result == PermissionStatus.granted;
+  //       } else if (status.isPermanentlyDenied) {
+  //         await openAppSettings();
+  //         return false;
+  //       }
+  //     }
+  //   }
+  //   // For other platforms, return true
+  //   return true;
+  // }
+
+  // Dialog methods
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: Text("OK"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Information"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: Text("OK"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build method
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Image Preview'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.download),
+            onPressed: _isLoading ? null : _downloadImage,
+          ),
+        ],
+      ),
+      body: Center(
+        child: _isLoading
+            ? CircularProgressIndicator()
+            : CachedNetworkImage(
+                imageUrl: widget.imageUrl,
+                placeholder: (context, url) => CircularProgressIndicator(),
+                errorWidget: (context, url, error) => Icon(Icons.error),
+              ),
+      ),
+    );
+  }
+}
 
 
 class UploadPage extends StatefulWidget {
@@ -19,7 +166,10 @@ class UploadPage extends StatefulWidget {
   _UploadPageState createState() => _UploadPageState();
 }
 
+
 class _UploadPageState extends State<UploadPage> {
+  static const platform = MethodChannel('com.phidrillsim.connect/download');
+
   User? user;
   bool _isLoading = false;
   String _currentFolder = 'uploads'; // Default to uploads folder
@@ -39,6 +189,8 @@ class _UploadPageState extends State<UploadPage> {
 
   String _firstName = '';
   String _surname = '';
+  String _department = '';
+  String _role = '';
 
   @override
   void initState() {
@@ -49,17 +201,21 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   // Method to fetch user's first name and surname
-  Future<void> _fetchUserData() async {
-    if (user != null) {
-      DocumentSnapshot userDoc = await firestore.collection('users').doc(user!.uid).get();
-      if (userDoc.exists) {
-        setState(() {
-          _firstName = userDoc['firstName'] ?? '';
-          _surname = userDoc['surname'] ?? '';
-        });
-      }
+Future<void> _fetchUserData() async {
+  if (user != null) {
+    DocumentSnapshot userDoc =
+        await firestore.collection('users').doc(user!.uid).get();
+    if (userDoc.exists) {
+      setState(() {
+        _firstName = userDoc['firstName'] ?? '';
+        _surname = userDoc['surname'] ?? '';
+        _department = userDoc['department'] ?? '';
+        _role = userDoc['role'] ?? '';
+      });
     }
   }
+}
+
 
   // Method to initialize default department folders
   Future<void> _initializeFolders() async {
@@ -83,47 +239,81 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Method to get the user's uploads and display folders and files
-  Future<List<Map<String, dynamic>>> _getFolderContents(String path) async {
-    try {
-      final ListResult result = await storage.ref(path).listAll();
-      List<Map<String, dynamic>> contents = [];
+// Modify the _getFolderContents method
+Future<List<Map<String, dynamic>>> _getFolderContents(String path) async {
+  try {
+    final ListResult result = await storage.ref(path).listAll();
+    List<Map<String, dynamic>> contents = [];
 
-      // Folders
-      for (var prefix in result.prefixes) {
-        contents.add({"name": prefix.name, "type": "folder", "path": prefix.fullPath});
-      }
-
-      // Files
-      for (var item in result.items) {
-        // Exclude the '.keep' files
-        if (item.name != '.keep') {
-          contents.add({"name": item.name, "type": "file", "path": item.fullPath});
-        }
-      }
-
-      // Handle empty folder case by checking if contents are empty
-      if (contents.isEmpty) {
-        contents.add({"name": "No items", "type": "empty", "path": ""});
-      }
-
-      return contents;
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        _showErrorDialog("You do not have permission to view this folder.");
-        return []; // Return empty list if permission is denied
-      } else {
-        rethrow;
-      }
-    } on MissingPluginException {
-      _showErrorDialog("You do not have permission.");
-      return [];
-    } catch (e) {
-      _showErrorDialog("An error occurred: $e");
-      return [];
+    // Folders
+    for (var prefix in result.prefixes) {
+      contents.add({
+        "name": prefix.name,
+        "type": "folder",
+        "path": prefix.fullPath,
+      });
     }
-  }
 
+    // Files
+    for (var item in result.items) {
+      // Exclude the '.keep' files
+      if (item.name != '.keep') {
+        // Determine file type based on extension
+        String extension = path_lib.extension(item.name).toLowerCase();
+        String fileType = 'unknown';
+
+        if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].contains(extension)) {
+          fileType = 'image';
+        } else if (['.pdf'].contains(extension)) {
+          fileType = 'pdf';
+        } else if (['.doc', '.docx'].contains(extension)) {
+          fileType = 'word';
+        } else if (['.xls', '.xlsx'].contains(extension)) {
+          fileType = 'excel';
+        } else if (['.ppt', '.pptx'].contains(extension)) {
+          fileType = 'powerpoint';
+        } else if (['.txt'].contains(extension)) {
+          fileType = 'text';
+        } else if (['.mp4', '.avi', '.mov', '.mkv'].contains(extension)) {
+          fileType = 'video';
+        } else if (['.mp3', '.wav', '.aac', '.flac'].contains(extension)) {
+          fileType = 'audio';
+        } else {
+          fileType = 'file';
+        }
+
+        // For images, get the download URL
+        String? thumbnailUrl;
+        if (fileType == 'image') {
+          try {
+            thumbnailUrl = await item.getDownloadURL();
+          } catch (e) {
+            thumbnailUrl = null; // Handle any errors in getting the URL
+          }
+        }
+
+        contents.add({
+          "name": item.name,
+          "type": "file",
+          "path": item.fullPath,
+          "fileType": fileType,
+          "thumbnailUrl": thumbnailUrl,
+        });
+      }
+    }
+
+    // Handle empty folder
+    if (contents.isEmpty) {
+      contents.add({"name": "No items", "type": "empty", "path": ""});
+    }
+
+    return contents;
+  } catch (e) {
+    // Handle errors
+    _showErrorDialog("An error occurred: $e");
+    return [];
+  }
+}
   // Method to create a new folder
   Future<void> _createNewFolder(String folderName) async {
     setState(() => _isLoading = true);
@@ -228,31 +418,40 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   // Method to prompt user to assign the file or lock it
-  Future<void> _promptFileAssignment(String fileName, String filePath) async {
-    bool assignFile = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Assign File"),
-        content: Text("Would you like to assign this file to someone?"),
-        actions: [
-          TextButton(
-            child: Text("Yes"),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-          TextButton(
-            child: Text("No"),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-        ],
-      ),
-    );
+Future<void> _promptFileAssignment(String fileName, String filePath) async {
+  bool assignFile = await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text("Assign File"),
+      content: Text("Would you like to assign this file to someone?"),
+      actions: [
+        TextButton(
+          child: Text("Yes"),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        TextButton(
+          child: Text("No"),
+          onPressed: () => Navigator.pop(context, false),
+        ),
+      ],
+    ),
+  );
 
-    if (assignFile == true) {
-      await _assignFileToUsers(fileName, filePath); // Proceed to assign the file to users
-    } else {
-      await _lockFileOption(fileName, filePath); // Lock the file if the user doesn't assign it
-    }
+  if (assignFile == true) {
+    await _assignFileToUsers(fileName, filePath); // Proceed to assign the file to users
+  } else {
+    // If not assigning, store the file information without assigned users
+    await firestore.collection('fileAssignments').add({
+      'fileName': fileName,
+      'filePath': filePath,
+      'uploadedBy': user!.uid,
+      'uploadedByName': '$_firstName $_surname',
+      'assignedTo': [],
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    _showInfoDialog("File uploaded successfully!");
   }
+}
 
   // Method to assign file to users
   Future<void> _assignFileToUsers(String fileName, String filePath) async {
@@ -321,89 +520,9 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  // Method to ask if the user wants to lock the file
-  Future<void> _lockFileOption(String fileName, String filePath) async {
-    bool lockFile = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Lock File"),
-        content: Text("Would you like to lock this file with a password?"),
-        actions: [
-          TextButton(
-            child: Text("Yes"),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-          TextButton(
-            child: Text("No"),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-        ],
-      ),
-    );
+  
 
-    if (lockFile == true) {
-      await _setFileLockPassword(fileName, filePath);
-    } else {
-      // If not locking the file and not assigning, save without assigned users
-      await firestore.collection('fileAssignments').add({
-        'fileName': fileName,
-        'filePath': filePath,
-        'uploadedBy': user!.uid,
-        'uploadedByName': '$_firstName $_surname',
-        'assignedTo': [],
-        'locked': false,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      _showInfoDialog("File uploaded successfully!");
-    }
-  }
 
-  // Method to lock the file with a password
-  Future<void> _setFileLockPassword(String fileName, String filePath) async {
-    TextEditingController passwordController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Set Lock Password"),
-        content: TextField(
-          controller: passwordController,
-          decoration: InputDecoration(hintText: "Enter password"),
-          obscureText: true,
-        ),
-        actions: [
-          TextButton(
-            child: Text("Lock"),
-            onPressed: () async {
-              if (passwordController.text.isNotEmpty) {
-                // Store file lock information in Firestore
-                await firestore.collection('fileAssignments').add({
-                  'fileName': fileName,
-                  'filePath': filePath,
-                  'uploadedBy': user!.uid,
-                  'uploadedByName': '$_firstName $_surname',
-                  'assignedTo': [],
-                  'locked': true,
-                  'lockPassword': passwordController.text,
-                  'timestamp': FieldValue.serverTimestamp(),
-                });
-                Navigator.pop(context);
-                _showInfoDialog("File locked with password!");
-              } else {
-                _showErrorDialog("Password cannot be empty.");
-              }
-            },
-          ),
-          TextButton(
-            child: Text("Cancel"),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   // Method to upload a file from local storage
   Future<void> _uploadFile() async {
@@ -548,7 +667,7 @@ class _UploadPageState extends State<UploadPage> {
 Future<void> _downloadFile(String filePath, String fileName) async {
   setState(() => _isLoading = true);  // Start showing the loader
   try {
-    // Fetch file details from Firestore (ensure proper Firestore query)
+    // Fetch file details from Firestore
     QuerySnapshot fileQuery = await firestore
         .collection('fileAssignments')
         .where('filePath', isEqualTo: filePath)
@@ -562,9 +681,8 @@ Future<void> _downloadFile(String filePath, String fileName) async {
 
     DocumentSnapshot fileDoc = fileQuery.docs.first;
 
-    // Get the uploader's user ID and file lock status
+    // Get the uploader's user ID
     String uploadedBy = fileDoc['uploadedBy'];
-    bool isLocked = fileDoc['locked'] ?? false;
 
     // Fetch uploader's details
     DocumentSnapshot uploaderDoc =
@@ -589,19 +707,15 @@ Future<void> _downloadFile(String filePath, String fileName) async {
       canDownload = true;
     }
 
-    if (isLocked && !canDownload) {
-      // If the file is locked and the user doesn't have permission, prompt for password
-      await _promptForPassword(fileDoc, filePath, fileName);
-    } else if (canDownload || !isLocked) {
-      // User has permission to download the file or file is not locked
-      await _download(filePath, fileName);  // Calls the updated download method
+    if (canDownload) {
+      // User has permission to download the file
+      await _download(filePath, fileName);  // Proceed with download
     } else {
-      // User does not have permission, show AlertDialog with uploader's name
+      // User does not have permission
       _showErrorDialog(
           'You do not have permission to view this file. Please contact your supervisor or $uploaderName who uploaded it.');
     }
   } catch (e) {
-    // Handle any errors
     _showErrorDialog('An error occurred: $e');
   } finally {
     setState(() => _isLoading = false);  // Stop showing the loader
@@ -611,213 +725,254 @@ Future<void> _downloadFile(String filePath, String fileName) async {
 
 
 
-  // Method to prompt user for password if the file is locked
-  Future<void> _promptForPassword(DocumentSnapshot fileDoc, String filePath, String fileName) async {
-    TextEditingController passwordController = TextEditingController();
 
-    bool correctPassword = false;
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("File Locked"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("This file is locked. Please enter the password to download."),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(hintText: "Enter password"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            child: Text("Submit"),
-            onPressed: () {
-              if (passwordController.text == fileDoc['lockPassword']) {
-                correctPassword = true;
-                Navigator.pop(context);
-              } else {
-                _showErrorDialog("Incorrect password.");
-              }
-            },
-          ),
-          TextButton(
-            child: Text("Cancel"),
-            onPressed: () {
-              correctPassword = false;
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    );
-
-    if (correctPassword) {
-      _download(filePath, fileName); // Proceed with download if password is correct
-    }
-  }
-
+ 
   // Method to download the file (actual logic to save file)
 // Method to download the file (save it to Downloads folder)
 Future<void> _download(String filePath, String fileName) async {
+  setState(() => _isLoading = true);
   try {
     final Reference ref = storage.ref(filePath);
     final String downloadURL = await ref.getDownloadURL();
 
-    // Get the public Downloads directory path (Scoped storage in Android 10+)
-    Directory? downloadsDir = Directory('/storage/emulated/0/Download');
-    String savePath = path.join(downloadsDir.path, fileName);
+    // Get MIME type of the file
+    final mimeType = lookupMimeType(fileName) ?? 'application/octet-stream';
 
-    // Download the file using an HTTP client
-    final httpClient = HttpClient();
-    final request = await httpClient.getUrl(Uri.parse(downloadURL));
-    final response = await request.close();
+    // Call the platform-specific code
+    final result = await platform.invokeMethod('saveFileToDownloads', {
+      'url': downloadURL,
+      'fileName': fileName,
+      'mimeType': mimeType,
+    });
 
-    // Save the file in the Downloads folder
-    final file = File(savePath);
-    await response.pipe(file.openWrite());
-
-    _showInfoDialog("File downloaded successfully to $savePath");
+    _showInfoDialog("File downloaded successfully");
+  } on PlatformException catch (e) {
+    _showErrorDialog("Error downloading file: ${e.message}");
   } catch (e) {
     _showErrorDialog("Error downloading file: $e");
+  } finally {
+    setState(() => _isLoading = false);
   }
 }
 
 
 
-  // Method to display folders and files in a grid view
-  Widget _buildFolderGrid(List<Map<String, dynamic>> folderContents) {
-    return GridView.builder(
-      padding: EdgeInsets.all(10),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, // Display 2 folders/files per row
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: folderContents.length + 1, // Extra item for "Add Folder"
-      itemBuilder: (context, index) {
-        // If this is the last item, show the "Add Folder" option
-        if (index == folderContents.length) {
-          return GestureDetector(
-            onTap: _showCreateFolderDialog,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, size: 50, color: Colors.black54),
-                    Text("Add Folder", style: TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
+// Future<bool> _requestStoragePermission() async {
+//   if (Platform.isAndroid) {
+//     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+//     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+//     if (androidInfo.version.sdkInt >= 30) {
+//       // For Android 11 and above
+//       var status = await Permission.manageExternalStorage.status;
+//       if (status.isGranted) {
+//         return true;
+//       } else if (status.isDenied) {
+//         var result = await Permission.manageExternalStorage.request();
+//         return result == PermissionStatus.granted;
+//       } else if (status.isPermanentlyDenied) {
+//         await openAppSettings();
+//         return false;
+//       }
+//     } else {
+//       // For Android 10 and below
+//       var status = await Permission.storage.status;
+//       if (status.isGranted) {
+//         return true;
+//       } else if (status.isDenied) {
+//         var result = await Permission.storage.request();
+//         return result == PermissionStatus.granted;
+//       } else if (status.isPermanentlyDenied) {
+//         await openAppSettings();
+//         return false;
+//       }
+//     }
+//   }
+//   // For other platforms, return true
+//   return true;
+// }
 
-        final item = folderContents[index];
 
-        // If it's an empty folder, display a "No items" message
-        if (item['type'] == 'empty') {
-          return Center(
-            child: Text("No items in this folder"),
-          );
-        }
 
+
+
+// Modify the _buildFolderGrid method
+Widget _buildFolderGrid(List<Map<String, dynamic>> folderContents) {
+  return GridView.builder(
+    padding: EdgeInsets.all(10),
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+    ),
+    itemCount: folderContents.length + 1, // Extra item for "Add Folder"
+    itemBuilder: (context, index) {
+      // Check if this is the last item (Add Folder button)
+      if (index == folderContents.length) {
         return GestureDetector(
-          onTap: () async {
-            if (item['type'] == 'folder') {
-              setState(() => _isLoading = true);
-              try {
-                // Attempt to access the folder to check for permissions
-                await storage.ref(item['path']).listAll();
-                setState(() {
-                  _currentFolder = item['path'];
-                  _isLoading = false;
-                });
-              } on FirebaseException catch (e) {
-                setState(() => _isLoading = false);
-                if (e.code == 'permission-denied') {
-                  _showErrorDialog("You do not have permission to view this folder.");
-                } else {
-                  _showErrorDialog("Error accessing folder: ${e.message}");
-                }
-              } on MissingPluginException {
-                setState(() => _isLoading = false);
-                _showErrorDialog("You do not have permission.");
-              } catch (e) {
-                setState(() => _isLoading = false);
-                _showErrorDialog("Error accessing folder: $e");
-              }
-            } else {
-              _downloadFile(item['path'], item['name']);
-            }
-          },
+          onTap: _showCreateFolderDialog,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: Colors.grey[300],
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        item['type'] == 'folder'
-                            ? Icons.folder
-                            : Icons.insert_drive_file,
-                        size: 50,
-                        color: Colors.blue,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        item['name'],
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                if (item['type'] == 'folder')
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: defaultDepartments.contains(item['name']) && _currentFolder == 'uploads'
-                        ? SizedBox()
-                        : IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              _deleteFolder(item['path'], item['name']);
-                            },
-                          ),
-                  ),
-                if (item['type'] == 'file')
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        _deleteFile(item['path'], item['name']);
-                      },
-                    ),
-                  ),
-              ],
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 50, color: Colors.black54),
+                  Text("Add Folder", style: TextStyle(color: Colors.black54)),
+                ],
+              ),
             ),
           ),
         );
-      },
+      }
+
+      // Now it's safe to access folderContents[index]
+      final item = folderContents[index];
+
+      // Handle empty folders
+      if (item['type'] == 'empty') {
+        return Center(
+          child: Text("No items in this folder"),
+        );
+      }
+
+      return GestureDetector(
+onTap: () async {
+  if (item['type'] == 'folder') {
+    // Check if the folder is a default department folder
+    if (defaultDepartments.contains(item['name'])) {
+      // Check if the user's department matches the folder name or if they are a Manager or Supervisor
+      if (_department == item['name'] || _role == 'Manager' || _role == 'Supervisors') {
+        // User has access
+        setState(() => _isLoading = true);
+        try {
+          await storage.ref(item['path']).listAll();
+          setState(() {
+            _currentFolder = item['path'];
+            _isLoading = false;
+          });
+        } catch (e) {
+          setState(() => _isLoading = false);
+          _showErrorDialog("Error accessing folder: $e");
+        }
+      } else {
+        // User does not have access
+        _showErrorDialog("You do not have permission to enter this department's folder.");
+      }
+    } else {
+      // Folder is not a default department folder, allow access
+      setState(() => _isLoading = true);
+      try {
+        await storage.ref(item['path']).listAll();
+        setState(() {
+          _currentFolder = item['path'];
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() => _isLoading = false);
+        _showErrorDialog("Error accessing folder: $e");
+      }
+    }
+  } else if (item['fileType'] == 'image' && item['thumbnailUrl'] != null) {
+    // Show image preview
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImagePreviewPage(
+          imageUrl: item['thumbnailUrl'],
+          filePath: item['path'],
+          fileName: item['name'],
+        ),
+      ),
     );
-  }
+          } else {
+            // Download other files
+            _downloadFile(item['path'], item['name']);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (item['type'] == 'folder')
+                      Icon(Icons.folder, size: 50, color: Colors.blue)
+                    else if (item['fileType'] == 'image' && item['thumbnailUrl'] != null)
+                      CachedNetworkImage(
+                        imageUrl: item['thumbnailUrl'],
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => CircularProgressIndicator(),
+                        errorWidget: (context, url, error) => Icon(Icons.broken_image, size: 50),
+                      )
+                    else if (item['fileType'] == 'pdf')
+                      Icon(Icons.picture_as_pdf, size: 50, color: Colors.red)
+                    else if (item['fileType'] == 'word')
+                      Icon(Icons.description, size: 50, color: Colors.blueAccent)
+                    else if (item['fileType'] == 'excel')
+                      Icon(Icons.grid_on, size: 50, color: Colors.green)
+                    else if (item['fileType'] == 'powerpoint')
+                      Icon(Icons.slideshow, size: 50, color: Colors.orange)
+                    else if (item['fileType'] == 'text')
+                      Icon(Icons.text_snippet, size: 50, color: Colors.grey)
+                    else if (item['fileType'] == 'video')
+                      Icon(Icons.video_library, size: 50, color: Colors.purple)
+                    else if (item['fileType'] == 'audio')
+                      Icon(Icons.audiotrack, size: 50, color: Colors.teal)
+                    else
+                      Icon(Icons.insert_drive_file, size: 50, color: Colors.blueGrey),
+                    SizedBox(height: 8),
+                    Text(
+                      item['name'],
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Delete button
+              if (item['type'] == 'folder')
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: defaultDepartments.contains(item['name']) && _currentFolder == 'uploads'
+                      ? SizedBox()
+                      : IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            _deleteFolder(item['path'], item['name']);
+                          },
+                        ),
+                ),
+              if (item['type'] == 'file')
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      _deleteFile(item['path'], item['name']);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 
   // Main UI build
   @override

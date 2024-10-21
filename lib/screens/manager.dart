@@ -161,9 +161,9 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
   late Map<String, dynamic> _userData;
   bool _isLoading = false;
 
-  late String _selectedRole;
-  late String _selectedDepartment;
-  late String _selectedStatus;
+  late String? _selectedRole;
+  late String? _selectedDepartment;
+  late String? _selectedStatus;
 
   @override
   void initState() {
@@ -171,19 +171,19 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
     _userData = widget.userData;
 
     // Initialize _selectedRole
-    _selectedRole = widget.roles.contains(_userData['role'])
+    _selectedRole = widget.roles.contains(_userData['role'] ?? '')
         ? _userData['role']
         : widget.roles.first;
 
     // Initialize _selectedDepartment
-    _selectedDepartment = widget.departments.contains(_userData['department'])
+    _selectedDepartment = widget.departments.contains(_userData['department'] ?? '')
         ? _userData['department']
         : 'N/A';
 
     // Initialize _selectedStatus
-    _selectedStatus = widget.statuses.contains(_userData['employeeStatus'])
-        ? _userData['employeeStatus']
-        : (_userData['status'] ?? widget.statuses.first);
+_selectedStatus = widget.statuses.contains(_userData['employeeStatus'] ?? _userData['status'] ?? '')
+    ? (_userData['employeeStatus'] ?? _userData['status'] ?? widget.statuses.first)
+    : widget.statuses.first;
   }
 
   Future<void> _updateUserData() async {

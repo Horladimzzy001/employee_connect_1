@@ -15,11 +15,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // Controllers for form fields
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController(); // Added controller for confirm password
+  final TextEditingController confirmPasswordController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController surnameController = TextEditingController();
   final TextEditingController accessCodeController = TextEditingController();
-  final TextEditingController companyNameController = TextEditingController(); // Added controller for company name
+  final TextEditingController companyNameController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
@@ -68,115 +68,120 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _tryRegister() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
-
-  setState(() => _isLoading = true);
-
-  // Show the loading screen when the sign-up process starts
-  Navigator.push(
-      context, MaterialPageRoute(builder: (context) => Loading()));
-
-  try {
-    // Fetch the access code from Firestore to verify if it's valid
-    DocumentSnapshot accessCodeDoc = await FirebaseFirestore.instance
-        .collection('access_code')
-        .doc(accessCodeController.text.trim())
-        .get();
-
-    if (!accessCodeDoc.exists) {
-      // If the access code does not exist, show an error and stop the sign-up process
-      Fluttertoast.showToast(msg: 'Invalid Access Code. Please try again.');
-      Navigator.pop(context); // Close the loading screen
-      setState(() => _isLoading = false);
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Get the role from the access code document
-    String role = accessCodeDoc['role'] ?? 'General';
+    setState(() => _isLoading = true);
 
-    // Create user with email and password
-    UserCredential userCredential = await FirebaseAuth.instance
-        .createUserWithEmailAndPassword(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
+    // Show the loading screen when the sign-up process starts
+    Navigator.push(
+        context, MaterialPageRoute(builder: (context) => Loading()));
 
-    // Get the current user
-    User? user = userCredential.user;
-
-    // Send email verification
-    if (user != null) {
-      await user.sendEmailVerification();
-    }
-
-    // Capitalize the first letter of the first name and surname
-    String firstName = nameController.text.trim();
-    firstName = firstName[0].toUpperCase() + firstName.substring(1).toLowerCase();
-
-    String surname = surnameController.text.trim();
-    surname = surname[0].toUpperCase() + surname.substring(1).toLowerCase();
-
-    // Prepare user data to save to Firestore
-    print('Status before saving: $_status');
-    print('Company Name: ${companyNameController.text}');
-
-    Map<String, dynamic> userData = {
-      'firstName': firstName,
-      'surname': surname,
-      'email': emailController.text.trim(),
-      'status': _status,
-      'role': role,
-    };
-
-    if (_status.trim() == 'Employee') {
-      userData['department'] = _department;
-      userData['employeeStatus'] = 'Full Employee';
-    } else {
-      userData['department'] = 'N/A';
-    }
-
-    if (_status.trim() == 'Client') {
-      userData['companyName'] = companyNameController.text.trim();
-    }
-
-    // Save user details to Firestore
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user!.uid).set(userData);
+      // Fetch the access code from Firestore to verify if it's valid
+      DocumentSnapshot accessCodeDoc = await FirebaseFirestore.instance
+          .collection('access_code')
+          .doc(accessCodeController.text.trim())
+          .get();
+
+      if (!accessCodeDoc.exists) {
+        // If the access code does not exist, show an error and stop the sign-up process
+        Fluttertoast.showToast(msg: 'Invalid Access Code. Please try again.');
+        Navigator.pop(context); // Close the loading screen
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Get the role from the access code document
+      String role = accessCodeDoc['role'] ?? 'General';
+
+      // Create user with email and password
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      // Get the current user
+      User? user = userCredential.user;
+
+      // Send email verification
+      if (user != null) {
+        await user.sendEmailVerification();
+      }
+
+      // Capitalize the first letter of the first name and surname
+      String firstName = nameController.text.trim();
+      firstName = firstName[0].toUpperCase() + firstName.substring(1).toLowerCase();
+
+      String surname = surnameController.text.trim();
+      surname = surname[0].toUpperCase() + surname.substring(1).toLowerCase();
+
+      // Prepare user data to save to Firestore
+      Map<String, dynamic> userData = {
+        'firstName': firstName,
+        'surname': surname,
+        'email': emailController.text.trim(),
+        'status': _status,
+        'role': role,
+      };
+
+      if (_status.trim() == 'Employee') {
+        userData['department'] = _department;
+        userData['employeeStatus'] = 'Full Employee';
+      } else {
+        userData['department'] = 'N/A';
+      }
+
+      if (_status.trim() == 'Client') {
+        userData['companyName'] = companyNameController.text.trim();
+      }
+
+      // Save user details to Firestore
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user!.uid).set(userData);
+      } catch (e) {
+        print('Error saving to Firestore: $e');
+        Fluttertoast.showToast(msg: 'Error saving user data. Please try again.');
+      }
+
+      Fluttertoast.showToast(
+          msg: 'Verification email sent! Please verify your email.');
+
+      // Close the loading screen before navigating away
+      Navigator.pop(context);
+
+      // Navigate to the home screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
     } catch (e) {
-      print('Error saving to Firestore: $e');
-      Fluttertoast.showToast(msg: 'Error saving user data. Please try again.');
+      Fluttertoast.showToast(msg: e.toString());
+      Navigator.pop(context); // Close the loading screen if there is an error
+    } finally {
+      setState(() => _isLoading = false);
     }
-
-    Fluttertoast.showToast(
-        msg: 'Verification email sent! Please verify your email.');
-
-    // Close the loading screen before navigating away
-    Navigator.pop(context);
-
-    // Navigate to the home screen
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomeScreen()),
-    );
-  } catch (e) {
-    Fluttertoast.showToast(msg: e.toString());
-    Navigator.pop(context); // Close the loading screen if there is an error
-  } finally {
-    setState(() => _isLoading = false);
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
+    // Determine if the screen is large
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    double horizontalPadding = isLargeScreen ? 100 : 24.0;
+    double fontSize = isLargeScreen ? 32 : 24;
+
     return Scaffold(
       backgroundColor: Colors.white, // Set background color to white
-      body: SingleChildScrollView(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.0),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 16.0,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 600),
             child: Column(
               children: [
                 SizedBox(height: 60),
@@ -184,7 +189,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Text(
                   'Sign Up',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: fontSize,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -194,102 +199,120 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: Column(
                     children: [
                       // First Name Field
-                      TextFormField(
-                        controller: nameController,
-                        decoration: InputDecoration(
-                          labelText: 'First Name',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: nameController,
+                          decoration: InputDecoration(
+                            labelText: 'First Name',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.person),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.person),
                         ),
                       ),
                       SizedBox(height: 16),
                       // Surname Field
-                      TextFormField(
-                        controller: surnameController,
-                        decoration: InputDecoration(
-                          labelText: 'Surname',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: surnameController,
+                          decoration: InputDecoration(
+                            labelText: 'Surname',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.person_outline),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.person_outline),
                         ),
                       ),
                       SizedBox(height: 16),
                       // Email Field
-                      TextFormField(
-                        controller: emailController,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.email),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.email),
+                          validator: _validateEmail,
                         ),
-                        validator: _validateEmail,
                       ),
                       SizedBox(height: 16),
                       // Password Field
-                      TextFormField(
-                        controller: passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.lock),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.lock),
+                          validator: _validatePassword,
                         ),
-                        validator: _validatePassword,
                       ),
                       SizedBox(height: 16),
                       // Confirm Password Field
-                      TextFormField(
-                        controller: confirmPasswordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm Password',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: confirmPasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.lock_outline),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.lock_outline),
+                          validator: _validateConfirmPassword,
                         ),
-                        validator: _validateConfirmPassword,
                       ),
                       SizedBox(height: 16),
                       // Status Dropdown
-                      DropdownButtonFormField(
-                        value: _status,
-                        items: ['Employee', 'Client', 'Visitor']
-                            .map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _status = newValue!;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Status',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: DropdownButtonFormField(
+                          value: _status,
+                          items: ['Employee', 'Client', 'Visitor']
+                              .map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _status = newValue!;
+                            });
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Status',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
                         ),
                       ),
                       SizedBox(height: 16),
@@ -297,26 +320,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       if (_status == 'Employee')
                         Column(
                           children: [
-                            DropdownButtonFormField(
-                              value: _department,
-                              items: departments.map((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _department = newValue!;
-                                });
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'Department',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                            SizedBox(
+                              width: double.infinity,
+                              child: DropdownButtonFormField(
+                                value: _department,
+                                items: departments.map((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _department = newValue!;
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  labelText: 'Department',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[100],
                                 ),
-                                filled: true,
-                                fillColor: Colors.grey[100],
                               ),
                             ),
                             SizedBox(height: 16),
@@ -326,40 +352,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       if (_status == 'Client')
                         Column(
                           children: [
-                            TextFormField(
-                              controller: companyNameController,
-                              decoration: InputDecoration(
-                                labelText: 'Company Name',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextFormField(
+                                controller: companyNameController,
+                                decoration: InputDecoration(
+                                  labelText: 'Company Name',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[100],
+                                  prefixIcon: Icon(Icons.business),
                                 ),
-                                filled: true,
-                                fillColor: Colors.grey[100],
-                                prefixIcon: Icon(Icons.business),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your company name';
+                                  }
+                                  return null;
+                                },
                               ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your company name';
-                                }
-                                return null;
-                              },
                             ),
                             SizedBox(height: 16),
                           ],
                         ),
                       // Access Code Field
-                      TextFormField(
-                        controller: accessCodeController,
-                        decoration: InputDecoration(
-                          labelText: 'Access Code',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextFormField(
+                          controller: accessCodeController,
+                          decoration: InputDecoration(
+                            labelText: 'Access Code',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            prefixIcon: Icon(Icons.vpn_key),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          prefixIcon: Icon(Icons.vpn_key),
+                          validator: _validateAccessCode,
                         ),
-                        validator: _validateAccessCode, // Apply the validation here
                       ),
                       SizedBox(height: 24),
                       // Sign Up Button

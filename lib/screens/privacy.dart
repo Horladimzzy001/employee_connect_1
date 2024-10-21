@@ -14,12 +14,12 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   bool _showPhoneNumber = false;
   bool _showHobbies = false;
   bool _concealAll = false;
-  bool _loading = true; // To handle loading state
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPrivacySettings(); // Load the saved privacy settings
+    _loadPrivacySettings();
   }
 
   Future<void> _loadPrivacySettings() async {
@@ -44,7 +44,6 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     } catch (e) {
       Fluttertoast.showToast(msg: 'Error loading privacy settings');
     } finally {
-      // Ensure that the loading state is updated in case of success or failure
       setState(() {
         _loading = false;
       });
@@ -58,9 +57,9 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
         title: Text("Privacy Settings"),
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator()) // Show loading spinner
+          ? Center(child: CircularProgressIndicator())
           : Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -69,50 +68,51 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 20),
-                  CheckboxListTile(
+                  SwitchListTile(
                     activeColor: Colors.blue,
                     title: Text("Show Email"),
                     value: _concealAll ? false : _showEmail,
                     onChanged: (value) {
                       if (!_concealAll) {
                         setState(() {
-                          _showEmail = value!;
+                          _showEmail = value;
                         });
                       }
                     },
                   ),
-                  CheckboxListTile(
+                  SwitchListTile(
                     activeColor: Colors.blue,
                     title: Text("Show Phone Number"),
                     value: _concealAll ? false : _showPhoneNumber,
                     onChanged: (value) {
                       if (!_concealAll) {
                         setState(() {
-                          _showPhoneNumber = value!;
+                          _showPhoneNumber = value;
                         });
                       }
                     },
                   ),
-                  CheckboxListTile(
+                  SwitchListTile(
                     activeColor: Colors.blue,
                     title: Text("Show Hobbies"),
                     value: _concealAll ? false : _showHobbies,
                     onChanged: (value) {
                       if (!_concealAll) {
                         setState(() {
-                          _showHobbies = value!;
+                          _showHobbies = value;
                         });
                       }
                     },
                   ),
-                  CheckboxListTile(
+                  Divider(height: 40),
+                  SwitchListTile(
                     activeColor: Colors.blue,
                     title: Text(
                         "Conceal All Information (only show Name & Surname)"),
                     value: _concealAll,
                     onChanged: (value) {
                       setState(() {
-                        _concealAll = value!;
+                        _concealAll = value;
                         if (_concealAll) {
                           _showEmail = false;
                           _showPhoneNumber = false;
@@ -121,17 +121,18 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                       });
                     },
                   ),
-                  SizedBox(height: 100),
+                  Spacer(),
                   Center(
                     child: ElevatedButton(
                       onPressed: _savePrivacySettings,
                       child: Text('Save Privacy Settings'),
                       style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.white, backgroundColor: Colors.blue, // Set the button text color to white
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.blue,
                         padding:
                             EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                        textStyle:
-                            TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+                        textStyle: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.normal),
                       ),
                     ),
                   ),

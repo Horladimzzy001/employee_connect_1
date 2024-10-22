@@ -12,6 +12,7 @@ class SettingsPage extends StatefulWidget {
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
+
 class FullScreenImage extends StatelessWidget {
   final String imageUrl;
 
@@ -31,7 +32,6 @@ class FullScreenImage extends StatelessWidget {
     );
   }
 }
-
 
 class _SettingsPageState extends State<SettingsPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -142,40 +142,39 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> uploadPicture(ImageSource source) async {
-  setState(() {
-    _isLoading = true; // Show loading while uploading
-  });
-
-  try {
-    final pickedFile = await _picker.pickImage(source: source);
-    if (pickedFile != null) {
-      _imageFile = File(pickedFile.path);
-
-      String fileName = 'profile_${user!.uid}.png';
-      Reference firebaseStorageRef =
-          FirebaseStorage.instance.ref().child('profile_pictures/$fileName');
-
-      UploadTask uploadTask = firebaseStorageRef.putFile(_imageFile!);
-      TaskSnapshot taskSnapshot = await uploadTask;
-
-      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
-      imageUrl = downloadUrl;
-
-      await _firestore.collection('users').doc(user!.uid).update({
-        'profilePictureURL': downloadUrl,
-      });
-
-      Fluttertoast.showToast(msg: 'Profile picture updated successfully!');
-    }
-  } catch (e) {
-    Fluttertoast.showToast(msg: 'Error uploading picture: $e');
-  } finally {
     setState(() {
-      _isLoading = false; // Hide loading once done
+      _isLoading = true; // Show loading while uploading
     });
-  }
-}
 
+    try {
+      final pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile != null) {
+        _imageFile = File(pickedFile.path);
+
+        String fileName = 'profile_${user!.uid}.png';
+        Reference firebaseStorageRef =
+            FirebaseStorage.instance.ref().child('profile_pictures/$fileName');
+
+        UploadTask uploadTask = firebaseStorageRef.putFile(_imageFile!);
+        TaskSnapshot taskSnapshot = await uploadTask;
+
+        String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+        imageUrl = downloadUrl;
+
+        await _firestore.collection('users').doc(user!.uid).update({
+          'profilePictureURL': downloadUrl,
+        });
+
+        Fluttertoast.showToast(msg: 'Profile picture updated successfully!');
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'Error uploading picture: $e');
+    } finally {
+      setState(() {
+        _isLoading = false; // Hide loading once done
+      });
+    }
+  }
 
   void _showPictureOptions() {
     showModalBottomSheet(
@@ -200,7 +199,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 uploadPicture(ImageSource.gallery);
               },
             ),
-           
           ],
         ),
       ),
@@ -210,157 +208,262 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Loading(); 
+      return Loading();
     }
 
+    // Determine if the screen is large
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+
     return Scaffold(
-      backgroundColor: Colors.white, // Set background color to white
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            children: <Widget>[
-              SizedBox(height: 20),
-              if (imageUrl != null)
-  GestureDetector(
-    onTap: () {
-      if (imageUrl!.isNotEmpty) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FullScreenImage(imageUrl: imageUrl!),
-          ),
-        );
-      }
-    },
-    child: CircleAvatar(
-      radius: 60,
-      backgroundImage:
-          imageUrl!.isNotEmpty ? NetworkImage(imageUrl!) : null,
-      backgroundColor: Colors.blue[100],
-      child: imageUrl!.isEmpty
-          ? Icon(Icons.person, size: 60, color: Colors.blue)
-          : null,
-    ),
-  ),
-
-                   
-              SizedBox(height: 16),
-              TextButton.icon(
-                onPressed: _showPictureOptions,
-                icon: Icon(Icons.camera_alt, color: Colors.blue),
-                label: Text(
-                  'Upload Picture',
-                  style: TextStyle(color: Colors.blue),
-                ),
-              ),
-              SizedBox(height: 24),
-              Text(
-                '${userData?['firstName'] ?? ''} ${userData?['surname'] ?? ''}',
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '${userData?['email'] ?? ''}',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Department: ${userData?['department'] ?? ''}',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-              SizedBox(height: 24),
-              _buildTextField(
-                controller: homeAddressController,
-                labelText: 'Home Address',
-                icon: Icons.home,
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                controller: telephoneController,
-                labelText: 'Telephone Number',
-                icon: Icons.phone,
-                keyboardType: TextInputType.phone,
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                controller: hobbiesController,
-                labelText: 'Hobbies',
-                icon: Icons.favorite,
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                controller: favouriteQuoteController,
-                labelText: 'Favourite Quote',
-                icon: Icons.format_quote,
-              ),
-
-              SizedBox(
-  width: double.infinity,
-  child: ElevatedButton(
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => PrivacySettingsPage()),
-      );
-    },
-    child: Text(
-      'Privacy Settings',
-      style: TextStyle(fontSize: 18),
-    ),
-    style: ElevatedButton.styleFrom(
-      padding: EdgeInsets.symmetric(vertical: 16),
-      backgroundColor: Colors.blue,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
+        child: isLargeScreen ? _buildLargeScreenLayout() : _buildSmallScreenLayout(),
       ),
-    ),
-  ),
-),
+    );
+  }
 
-              SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: updateUserData,
-                  child: Text(
-                    'Update Info',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                  ),
+  Widget _buildSmallScreenLayout() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Column(
+        children: <Widget>[
+          SizedBox(height: 20),
+          _buildProfileImage(),
+          SizedBox(height: 16),
+          _buildUploadPictureButton(),
+          SizedBox(height: 24),
+          _buildUserInfo(),
+          SizedBox(height: 24),
+          _buildTextFields(),
+          SizedBox(height: 24),
+          _buildButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLargeScreenLayout() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column
+              Expanded(
+                flex: 1,
+                child: Column(
+                  children: [
+                    _buildProfileImage(),
+                    SizedBox(height: 16),
+                    _buildUploadPictureButton(),
+                  ],
                 ),
               ),
-              SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _showResetPasswordConfirmation,
-                  child: Text(
-                    'Reset Password',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                  ),
+              SizedBox(width: 40),
+              // Right Column
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildUserInfo(),
+                    SizedBox(height: 24),
+                    _buildTextFields(),
+                    SizedBox(height: 24),
+                    _buildButtons(),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildProfileImage() {
+    // Determine screen size
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    double avatarRadius = isLargeScreen ? 80 : 60;
+    double iconSize = isLargeScreen ? 80 : 60;
+
+    return GestureDetector(
+      onTap: () {
+        if (imageUrl != null && imageUrl!.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenImage(imageUrl: imageUrl!),
+            ),
+          );
+        }
+      },
+      child: CircleAvatar(
+        radius: avatarRadius,
+        backgroundImage:
+            imageUrl != null && imageUrl!.isNotEmpty ? NetworkImage(imageUrl!) : null,
+        backgroundColor: Colors.blue[100],
+        child: imageUrl == null || imageUrl!.isEmpty
+            ? Icon(Icons.person, size: iconSize, color: Colors.blue)
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildUploadPictureButton() {
+    return TextButton.icon(
+      onPressed: _showPictureOptions,
+      icon: Icon(Icons.camera_alt, color: Colors.blue),
+      label: Text(
+        'Upload Picture',
+        style: TextStyle(color: Colors.blue),
+      ),
+    );
+  }
+
+  Widget _buildUserInfo() {
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    double nameFontSize = isLargeScreen ? 32 : 28;
+    double infoFontSize = isLargeScreen ? 18 : 16;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${userData?['firstName'] ?? ''} ${userData?['surname'] ?? ''}',
+          style: TextStyle(
+              fontSize: nameFontSize,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue),
+        ),
+        SizedBox(height: 8),
+        Text(
+          '${userData?['email'] ?? ''}',
+          style: TextStyle(fontSize: infoFontSize, color: Colors.grey[700]),
+        ),
+        SizedBox(height: 8),
+        Text(
+          'Department: ${userData?['department'] ?? ''}',
+          style: TextStyle(fontSize: infoFontSize, color: Colors.grey[700]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextFields() {
+    return Column(
+      children: [
+        _buildTextField(
+          controller: homeAddressController,
+          labelText: 'Home Address',
+          icon: Icons.home,
+        ),
+        SizedBox(height: 16),
+        _buildTextField(
+          controller: telephoneController,
+          labelText: 'Telephone Number',
+          icon: Icons.phone,
+          keyboardType: TextInputType.phone,
+        ),
+        SizedBox(height: 16),
+        _buildTextField(
+          controller: hobbiesController,
+          labelText: 'Hobbies',
+          icon: Icons.favorite,
+        ),
+        SizedBox(height: 16),
+        _buildTextField(
+          controller: favouriteQuoteController,
+          labelText: 'Favourite Quote',
+          icon: Icons.format_quote,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildButtons() {
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    return Column(
+      children: [
+        SizedBox(height: 16),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isLargeScreen ? 600 : double.infinity,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PrivacySettingsPage()),
+                );
+              },
+              child: Text(
+                'Privacy Settings',
+                style: TextStyle(fontSize: 18),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isLargeScreen ? 600 : double.infinity,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: updateUserData,
+              child: Text(
+                'Update Info',
+                style: TextStyle(fontSize: 18),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 16),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isLargeScreen ? 600 : double.infinity,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _showResetPasswordConfirmation,
+              child: Text(
+                'Reset Password',
+                style: TextStyle(fontSize: 18),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -370,17 +473,23 @@ class _SettingsPageState extends State<SettingsPage> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: labelText,
-        filled: true,
-        fillColor: Colors.grey[100],
-        prefixIcon: Icon(icon, color: Colors.blue),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: BorderSide.none,
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: isLargeScreen ? 600 : double.infinity,
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: labelText,
+          filled: true,
+          fillColor: Colors.grey[100],
+          prefixIcon: Icon(icon, color: Colors.blue),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );

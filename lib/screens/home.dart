@@ -5,7 +5,7 @@ import 'package:phidrillsim_connect/bookings/bookings.dart';
 import 'package:phidrillsim_connect/chat/private_chat';
 
 import 'package:phidrillsim_connect/departmental_chat/department_chat.dart';
-import 'package:phidrillsim_connect/general%20chat/general_chatpage.dart';
+import 'package:phidrillsim_connect/general chat/general_chatpage.dart';
 import 'package:phidrillsim_connect/screens/auth/login_screen.dart';
 import 'package:phidrillsim_connect/screens/calendar';
 
@@ -29,11 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _role = '';
   String _profilePictureURL = '';
   bool _isEmailVerified = false;
-  String _userId = ''; // Add this line to store the userId
+  String _userId = '';
   final GlobalKey<ScaffoldState> _scaffoldKey =
       GlobalKey<ScaffoldState>(); // To control the sidebar
-
-  
 
   @override
   void initState() {
@@ -58,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _profilePictureURL = userData['profilePictureURL'] ?? '';
           _isEmailVerified = user.emailVerified;
           _userId = user.uid; // Store the userId
-          
         });
       }
     }
@@ -76,34 +73,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
+    // Determine if the screen is large
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    double? drawerWidth = isLargeScreen ? 300 : null;
+    double avatarRadius = isLargeScreen ? 60 : 50;
+    double fontSize = isLargeScreen ? 24 : 20;
+    double nameFontSize = isLargeScreen ? 28 : 24;
+
     return Scaffold(
       key: _scaffoldKey, // Key to control the sidebar
       backgroundColor: Colors.white, // Set background color to white
       drawer: Drawer(
         // Sidebar drawer
+        width: drawerWidth,
         child: SafeArea(
           child: Column(
             children: [
               SizedBox(height: 30),
               // User Avatar and Info
               CircleAvatar(
-                radius: 50,
+                radius: avatarRadius,
                 backgroundColor: Colors.blue[100],
                 backgroundImage: _profilePictureURL.isNotEmpty
                     ? NetworkImage(_profilePictureURL)
-                    : null,
+                    : AssetImage('assets/images/default_avatar.png') as ImageProvider,
                 child: _profilePictureURL.isEmpty
-                    ? Text(
-                        _firstName.isNotEmpty ? _firstName[0].toUpperCase() : '',
-                        style: TextStyle(fontSize: 40, color: Colors.blue),
-                      )
+                    ? null
                     : null,
               ),
               SizedBox(height: 10),
               Text(
                 '$_firstName $_surname',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: nameFontSize, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
               SizedBox(height: 5),
               Text(
@@ -112,7 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     : _status == 'Client'
                         ? 'Client'
                         : _department,
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                style: TextStyle(fontSize: fontSize, color: Colors.grey[700]),
+                textAlign: TextAlign.center,
               ),
               SizedBox(height: 20),
               if (_isEmailVerified)
@@ -146,19 +149,26 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             // Toggle button to open the sidebar
-            Row(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.menu, color: Colors.blue),
-                  onPressed: () {
-                    _scaffoldKey.currentState?.openDrawer();
-                  },
-                ),
-                Text(
-                  'Home',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue),
-                ),
-              ],
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: isLargeScreen ? 24 : 16),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.menu, color: Colors.blue),
+                    onPressed: () {
+                      _scaffoldKey.currentState?.openDrawer();
+                    },
+                  ),
+                  Text(
+                    'Home',
+                    style: TextStyle(
+                      fontSize: isLargeScreen ? 32 : 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
             ),
             // Centered Welcome Message
             Padding(
@@ -166,18 +176,26 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Center(
                 child: Text(
                   'Hello, $_firstName!',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: isLargeScreen ? 30 : 26, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
             // Grid of Features
             Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                padding: EdgeInsets.all(16),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: _buildHomeTiles(),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: isLargeScreen ? 24 : 16),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    int crossAxisCount = isLargeScreen ? 4 : 2;
+                    return GridView.count(
+                      crossAxisCount: crossAxisCount,
+                      padding: EdgeInsets.all(8),
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      children: _buildHomeTiles(),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -268,10 +286,10 @@ class _HomeScreenState extends State<HomeScreen> {
           'surname': _surname,
           'department': _department,
           'status': _status,
-          'role': _role, // Make sure to include the role
-          'userId': _userId, // Include the userId here
-          'profilePictureURL': _profilePictureURL, // Include profile picture URL if needed
-         'deviceToken': '', // Include deviceToken if you have it
+          'role': _role,
+          'userId': _userId,
+          'profilePictureURL': _profilePictureURL,
+          'deviceToken': '',
         };
 
         Navigator.push(
@@ -298,14 +316,12 @@ class _HomeScreenState extends State<HomeScreen> {
           MaterialPageRoute(builder: (context) => CalendarPage()),
         );
       }),
-      
       _buildHomeTile(Icons.assignment, 'Submissions', () {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => SubmissionsPage()),
         );
       }),
-      
       _buildHomeTile(Icons.date_range, 'Bookings', () {
         Navigator.push(
           context,
@@ -319,6 +335,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTile(IconData icon, String label, VoidCallback onTap) {
+    // Adjust icon and font sizes based on screen size
+    bool isLargeScreen = MediaQuery.of(context).size.width > 800;
+    double iconSize = isLargeScreen ? 50 : 40;
+    double fontSize = isLargeScreen ? 18 : 16;
+
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -333,12 +354,13 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: Colors.blue),
+              Icon(icon, size: iconSize, color: Colors.blue),
               SizedBox(height: 10),
               Text(
                 label,
                 style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -347,9 +369,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-
-
 
 class NotificationsScreen extends StatelessWidget {
   @override

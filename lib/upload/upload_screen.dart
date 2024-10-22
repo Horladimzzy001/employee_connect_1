@@ -12,6 +12,9 @@ import 'package:lecle_downloads_path_provider/lecle_downloads_path_provider.dart
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:mime/mime.dart'; // For determining MIME types
 import 'package:cached_network_image/cached_network_image.dart'; // For image caching
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'dart:html' as html;
 
 
 import 'package:path/path.dart' as path_lib;
@@ -65,6 +68,7 @@ Future<void> _downloadImage() async {
     setState(() => _isLoading = false);
   }
 }
+
 
 
   // Future<bool> _requestStoragePermission() async {
@@ -722,6 +726,26 @@ Future<void> _downloadFile(String filePath, String fileName) async {
   }
 }
 
+Future<void> _downloadFileWeb(String url, String fileName) async {
+  try {
+    // Create an anchor element and set the href to the file URL
+    final html.AnchorElement anchor = html.AnchorElement(href: url)
+      ..target = 'blank';
+
+    // Set the download attribute with the desired file name
+    anchor.download = fileName;
+
+    // Trigger the download by simulating a click
+    html.document.body?.append(anchor);
+    anchor.click();
+
+    // Remove the anchor element from the document
+    anchor.remove();
+  } catch (e) {
+    _showErrorDialog("Error downloading file: $e");
+  }
+}
+
 
 
 
@@ -738,12 +762,17 @@ Future<void> _download(String filePath, String fileName) async {
     // Get MIME type of the file
     final mimeType = lookupMimeType(fileName) ?? 'application/octet-stream';
 
-    // Call the platform-specific code
-    final result = await platform.invokeMethod('saveFileToDownloads', {
-      'url': downloadURL,
-      'fileName': fileName,
-      'mimeType': mimeType,
-    });
+    if (kIsWeb) {
+      // For Web Platform
+      await _downloadFileWeb(downloadURL, fileName);
+    } else {
+      // For Mobile Platforms
+      await platform.invokeMethod('saveFileToDownloads', {
+        'url': downloadURL,
+        'fileName': fileName,
+        'mimeType': mimeType,
+      });
+    }
 
     _showInfoDialog("File downloaded successfully");
   } on PlatformException catch (e) {
@@ -754,6 +783,7 @@ Future<void> _download(String filePath, String fileName) async {
     setState(() => _isLoading = false);
   }
 }
+
 
 
 
